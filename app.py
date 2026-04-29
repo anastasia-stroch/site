@@ -1,8 +1,10 @@
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import requests
+import json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mysecretkey12345'
@@ -37,10 +39,12 @@ class User(db.Model):
 class MyItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
-    about = db.Column(db.Text)
-    type_of_item = db.Column(db.String(50), nullable=False)
+    genre = db.Column(db.String(100), default='Неизвестно')
+    description = db.Column(db.Text, default='')
+    imdb_rating = db.Column(db.String(20), default='Нет рейтинга')
+    year = db.Column(db.String(10), default='')
     how_its_going = db.Column(db.String(50), default='plan')
-    my_rating = db.Column(db.Integer)
+    my_rating = db.Column(db.Integer, nullable=True)
     user_who_owns = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date_when_created = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -50,11 +54,88 @@ def load_this_user(user_id):
     return User.query.get(int(user_id))
 
 
+def search_movies_omdb(query):
+    try:
+        search_url = f"http://www.omdbapi.com/?s={query}&apikey=8d5e6f1b"
+
+        response = requests.get(search_url)
+
+        if response.status_code == 200:
+            data = response.json()
+
+            if data.get('Response') == 'True':
+                movies = []
+                for movie in data.get('Search', [])[:10]:
+                    movies.append({
+                        'imdbID': movie.get('imdbID'),
+                        'title': movie.get('Title'),
+                        'year': movie.get('Year'),
+                        'type': movie.get('Type')
+                    })
+                return movies
+            else:
+                print(f"OMDb ошибка: {data.get('Error')}")
+                return []
+        else:
+            print(f"HTTP ошибка: {response.status_code}")
+            return []
+
+    except Exception as e:
+        print(f"Ошибка поиска: {e}")
+        return []
+
+
+def get_movie_details_omdb(imdb_id):
+    try:
+        details_url = f"http://www.omdbapi.com/?i={imdb_id}&apikey=8d5e6f1b&plot=full"
+        response = requests.get(details_url)
+
+        if response.status_code == 200:
+            data = response.json()
+
+            if data.get('Response') == 'True':
+                return {
+                    'title': data.get('Title', 'Неизвестно'),
+                    'genre': data.get('Genre', 'Неизвестно'),
+                    'description': data.get('Plot', 'Описание не найдено')[:500],
+                    'rating': data.get('imdbRating', 'Нет рейтинга'),
+                    'year': data.get('Year', '')
+                }
+
+        return None
+
+    except Exception as e:
+        print(f"Ошибка получения деталей: {e}")
+        return None
+
+
 @app.route('/')
 @login_required
 def index():
     all_my_items = MyItem.query.filter_by(user_who_owns=current_user.id).order_by(MyItem.date_when_created.desc()).all()
     return render_template('index.html', items=all_my_items)
+
+
+@app.route('/search_movies')
+def search_movies():
+    query = request.args.get('query', '')
+    if len(query) < 2:
+        return jsonify([])
+
+    movies = search_movies_omdb(query)
+    return jsonify(movies)
+
+
+@app.route('/get_movie_details')
+def get_movie_details_route():
+    imdb_id = request.args.get('id', '')
+    if not imdb_id:
+        return jsonify({'error': 'No ID provided'}), 400
+
+    details = get_movie_details_omdb(imdb_id)
+    if details:
+        return jsonify(details)
+    return jsonify({'error': 'Not found'}), 404
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -146,33 +227,31 @@ def logout():
 @login_required
 def add_item():
     if request.method == 'POST':
-        name_from_form = request.form.get('title')
-        about_from_form = request.form.get('description')
-        type_from_form = request.form.get('item_type')
-        status_from_form = request.form.get('status')
-        rating_from_form = request.form.get('rating')
+        selected_id = request.form.get('selected_id')
 
-        if not name_from_form:
-            flash('Название обязательно', 'danger')
+        if not selected_id:
+            flash('Выбери фильм из списка!', 'danger')
             return redirect(url_for('add_item'))
 
-        if rating_from_form:
-            rating_as_number = int(rating_from_form)
+        movie_data = get_movie_details_omdb(selected_id)
+
+        if movie_data:
+            new_item = MyItem(
+                name=movie_data['title'],
+                genre=movie_data['genre'],
+                description=movie_data['description'],
+                imdb_rating=movie_data['rating'],
+                year=movie_data['year'],
+                how_its_going='plan',
+                user_who_owns=current_user.id
+            )
+
+            db.session.add(new_item)
+            db.session.commit()
+            flash(f'Фильм "{movie_data["title"]}" добавлен! Рейтинг IMDb: {movie_data["rating"]}', 'success')
         else:
-            rating_as_number = None
+            flash('Не удалось загрузить информацию о фильме', 'danger')
 
-        new_item = MyItem(
-            name=name_from_form,
-            about=about_from_form,
-            type_of_item=type_from_form,
-            how_its_going=status_from_form,
-            my_rating=rating_as_number,
-            user_who_owns=current_user.id
-        )
-
-        db.session.add(new_item)
-        db.session.commit()
-        flash('Добавлено!', 'success')
         return redirect(url_for('index'))
 
     return render_template('add_item.html')
@@ -188,16 +267,14 @@ def edit_item(id):
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        item_to_edit.name = request.form.get('title')
-        item_to_edit.about = request.form.get('description')
-        item_to_edit.type_of_item = request.form.get('item_type')
-        item_to_edit.how_its_going = request.form.get('status')
+        status_from_form = request.form.get('status')
         rating_from_form = request.form.get('rating')
+
+        if status_from_form:
+            item_to_edit.how_its_going = status_from_form
 
         if rating_from_form:
             item_to_edit.my_rating = int(rating_from_form)
-        else:
-            item_to_edit.my_rating = None
 
         db.session.commit()
         flash('Изменения сохранены!', 'success')
@@ -221,25 +298,8 @@ def delete_item(id):
     return redirect(url_for('index'))
 
 
-@app.route('/api/items')
-@login_required
-def api_items():
-    all_my_items = MyItem.query.filter_by(user_who_owns=current_user.id).all()
-
-    items_list = []
-    for one_item in all_my_items:
-        items_list.append({
-            'id': one_item.id,
-            'title': one_item.name,
-            'type': one_item.type_of_item,
-            'status': one_item.how_its_going,
-            'rating': one_item.my_rating
-        })
-
-    return {'items': items_list}
-
-
 with app.app_context():
+    db.drop_all()
     db.create_all()
 
 if __name__ == '__main__':
