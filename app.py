@@ -4,16 +4,65 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import requests
-import json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mysecretkey12345'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mydatabase.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+YOUR_KINOPOISK_API_KEY = 'A3HSBCJ-H7R4DKV-J06VFAH-2H86DVE'
+
+KNOWN_MOVIES = {
+    'рапунцель': {
+        'id': 84049,
+        'title': 'Рапунцель: Запутанная история',
+        'alt_titles': ['Tangled', 'Рапунцель', 'Запутанная история']
+    },
+    'шрек': {
+        'id': 434,
+        'title': 'Шрек',
+        'alt_titles': ['Shrek']
+    },
+    'тачки': {
+        'id': 417,
+        'title': 'Тачки',
+        'alt_titles': ['Cars']
+    },
+    'леон': {
+        'id': 389,
+        'title': 'Леон',
+        'alt_titles': ['Leon', 'The Professional']
+    },
+    'зеленая книга': {
+        'id': 512730,
+        'title': 'Зеленая книга',
+        'alt_titles': ['Green Book']
+    },
+    'джокер': {
+        'id': 1143242,
+        'title': 'Джокер',
+        'alt_titles': ['Joker']
+    },
+    'интерстеллар': {
+        'id': 258687,
+        'title': 'Интерстеллар',
+        'alt_titles': ['Interstellar']
+    },
+    'побег из шоушенка': {
+        'id': 326,
+        'title': 'Побег из Шоушенка',
+        'alt_titles': ['The Shawshank Redemption']
+    },
+    'начало': {
+        'id': 447301,
+        'title': 'Начало',
+        'alt_titles': ['Inception']
+    }
+}
 
 
 class User(db.Model):
@@ -41,8 +90,8 @@ class MyItem(db.Model):
     name = db.Column(db.String(200), nullable=False)
     genre = db.Column(db.String(100), default='Неизвестно')
     description = db.Column(db.Text, default='')
-    imdb_rating = db.Column(db.String(20), default='Нет рейтинга')
-    year = db.Column(db.String(10), default='')
+    kinopoisk_rating = db.Column(db.String(20), default='Нет рейтинга')
+    year = db.Column(db.String(20))
     how_its_going = db.Column(db.String(50), default='plan')
     my_rating = db.Column(db.Integer, nullable=True)
     user_who_owns = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -54,58 +103,113 @@ def load_this_user(user_id):
     return User.query.get(int(user_id))
 
 
-def search_movies_omdb(query):
+def search_movies_kinopoisk(query):
     try:
-        search_url = f"http://www.omdbapi.com/?s={query}&apikey=8d5e6f1b"
+        query_lower = query.strip().lower()
+        if len(query_lower) < 2:
+            return []
 
-        response = requests.get(search_url)
+        for known_key, known_movie in KNOWN_MOVIES.items():
+            if query_lower in known_key or query_lower in [t.lower() for t in known_movie['alt_titles']]:
+                details = get_movie_details_kinopoisk(known_movie['id'])
+                if details:
+                    return [{
+                        'id': known_movie['id'],
+                        'title': known_movie['title'],
+                        'year': details.get('year', ''),
+                        'rating': details.get('rating', 'Нет рейтинга')
+                    }]
+                else:
+                    return [{
+                        'id': known_movie['id'],
+                        'title': known_movie['title'],
+                        'year': '',
+                        'rating': 'Нет рейтинга'
+                    }]
+
+        url = "https://api.kinopoisk.dev/v1.4/movie/search"
+        headers = {
+            'X-API-KEY': YOUR_KINOPOISK_API_KEY,
+            'Content-Type': 'application/json'
+        }
+        params = {
+            'query': query_lower,
+            'limit': 30
+        }
+
+        response = requests.get(url, headers=headers, params=params, timeout=10)
 
         if response.status_code == 200:
             data = response.json()
+            movies = []
 
-            if data.get('Response') == 'True':
-                movies = []
-                for movie in data.get('Search', [])[:10]:
+            for movie in data.get('docs', []):
+                name_ru = movie.get('name') or ''
+                name_alt = movie.get('alternativeName') or ''
+                name_en = movie.get('enName') or ''
+
+                if (query_lower in name_ru.lower() or
+                        query_lower in name_alt.lower() or
+                        query_lower in name_en.lower()):
+                    title = name_ru or name_alt or name_en or 'Без названия'
                     movies.append({
-                        'imdbID': movie.get('imdbID'),
-                        'title': movie.get('Title'),
-                        'year': movie.get('Year'),
-                        'type': movie.get('Type')
+                        'id': movie.get('id'),
+                        'title': title,
+                        'year': movie.get('year', ''),
+                        'rating': movie.get('rating', {}).get('kp', 'Нет рейтинга')
                     })
-                return movies
-            else:
-                print(f"OMDb ошибка: {data.get('Error')}")
-                return []
+
+            seen = set()
+            unique_movies = []
+            for movie in movies:
+                if movie['id'] not in seen:
+                    seen.add(movie['id'])
+                    unique_movies.append(movie)
+
+            return unique_movies
         else:
-            print(f"HTTP ошибка: {response.status_code}")
             return []
 
-    except Exception as e:
-        print(f"Ошибка поиска: {e}")
+    except Exception:
         return []
 
 
-def get_movie_details_omdb(imdb_id):
+def get_movie_details_kinopoisk(movie_id):
     try:
-        details_url = f"http://www.omdbapi.com/?i={imdb_id}&apikey=8d5e6f1b&plot=full"
-        response = requests.get(details_url)
+        url = f"https://api.kinopoisk.dev/v1.4/movie/{movie_id}"
+        headers = {
+            'X-API-KEY': YOUR_KINOPOISK_API_KEY,
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
 
         if response.status_code == 200:
             data = response.json()
 
-            if data.get('Response') == 'True':
-                return {
-                    'title': data.get('Title', 'Неизвестно'),
-                    'genre': data.get('Genre', 'Неизвестно'),
-                    'description': data.get('Plot', 'Описание не найдено')[:500],
-                    'rating': data.get('imdbRating', 'Нет рейтинга'),
-                    'year': data.get('Year', '')
-                }
+            title = data.get('name') or data.get('alternativeName') or data.get('enName') or 'Без названия'
+            year = data.get('year', '')
+            genres = [genre.get('name', '') for genre in data.get('genres', [])]
+            genre_str = ', '.join(genres) if genres else 'Неизвестно'
 
-        return None
+            rating_data = data.get('rating', {})
+            rating = rating_data.get('kp') or rating_data.get('imdb') or 'Нет рейтинга'
+            if isinstance(rating, (int, float)):
+                rating = f"{rating:.1f}"
 
-    except Exception as e:
-        print(f"Ошибка получения деталей: {e}")
+            description = data.get('description') or data.get('shortDescription') or 'Описание не найдено'
+
+            return {
+                'title': title,
+                'year': str(year) if year else '',
+                'genre': genre_str,
+                'rating': str(rating),
+                'description': description
+            }
+        else:
+            return None
+
+    except Exception:
         return None
 
 
@@ -113,26 +217,37 @@ def get_movie_details_omdb(imdb_id):
 @login_required
 def index():
     all_my_items = MyItem.query.filter_by(user_who_owns=current_user.id).order_by(MyItem.date_when_created.desc()).all()
-    return render_template('index.html', items=all_my_items)
+
+    planned = sum(1 for item in all_my_items if item.how_its_going == 'plan')
+    watching = sum(1 for item in all_my_items if item.how_its_going == 'watching')
+    completed = sum(1 for item in all_my_items if item.how_its_going == 'completed')
+
+    ratings = [item.my_rating for item in all_my_items if item.my_rating]
+    avg_rating = sum(ratings) / len(ratings) if ratings else 0
+
+    return render_template('index.html',
+                           items=all_my_items,
+                           planned=planned,
+                           watching=watching,
+                           completed=completed,
+                           avg_rating=round(avg_rating, 1))
 
 
 @app.route('/search_movies')
 def search_movies():
-    query = request.args.get('query', '')
+    query = request.args.get('query', '').strip()
     if len(query) < 2:
         return jsonify([])
-
-    movies = search_movies_omdb(query)
+    movies = search_movies_kinopoisk(query)
     return jsonify(movies)
 
 
 @app.route('/get_movie_details')
 def get_movie_details_route():
-    imdb_id = request.args.get('id', '')
-    if not imdb_id:
+    movie_id = request.args.get('id', '')
+    if not movie_id:
         return jsonify({'error': 'No ID provided'}), 400
-
-    details = get_movie_details_omdb(imdb_id)
+    details = get_movie_details_kinopoisk(movie_id)
     if details:
         return jsonify(details)
     return jsonify({'error': 'Not found'}), 404
@@ -175,7 +290,8 @@ def register():
             db.session.commit()
             flash('Ты зарегистрировался! Теперь войди', 'success')
             return redirect(url_for('login'))
-        except:
+        except Exception:
+            db.session.rollback()
             flash('Что-то пошло не так', 'danger')
             return redirect(url_for('register'))
 
@@ -197,16 +313,12 @@ def login():
         if my_user:
             password_is_correct = check_password_hash(my_user.password, password_from_form)
             if password_is_correct:
-                if remember_me:
-                    login_user(my_user, remember=True)
-                else:
-                    login_user(my_user, remember=False)
+                login_user(my_user, remember=bool(remember_me))
                 flash('Привет, ' + my_user.username + '!', 'success')
-                next_page_that_user_wanted = request.args.get('next')
-                if next_page_that_user_wanted:
-                    return redirect(next_page_that_user_wanted)
-                else:
-                    return redirect(url_for('index'))
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
+                return redirect(url_for('index'))
             else:
                 flash('Неверный пароль', 'danger')
         else:
@@ -233,14 +345,23 @@ def add_item():
             flash('Выбери фильм из списка!', 'danger')
             return redirect(url_for('add_item'))
 
-        movie_data = get_movie_details_omdb(selected_id)
+        movie_data = get_movie_details_kinopoisk(selected_id)
 
         if movie_data:
+            existing = MyItem.query.filter_by(
+                name=movie_data['title'],
+                user_who_owns=current_user.id
+            ).first()
+
+            if existing:
+                flash(f'Фильм "{movie_data["title"]}" уже есть в вашем списке!', 'warning')
+                return redirect(url_for('index'))
+
             new_item = MyItem(
                 name=movie_data['title'],
                 genre=movie_data['genre'],
                 description=movie_data['description'],
-                imdb_rating=movie_data['rating'],
+                kinopoisk_rating=movie_data['rating'],
                 year=movie_data['year'],
                 how_its_going='plan',
                 user_who_owns=current_user.id
@@ -248,7 +369,7 @@ def add_item():
 
             db.session.add(new_item)
             db.session.commit()
-            flash(f'Фильм "{movie_data["title"]}" добавлен! Рейтинг IMDb: {movie_data["rating"]}', 'success')
+            flash(f'Фильм "{movie_data["title"]}" добавлен! Рейтинг КП: {movie_data["rating"]}', 'success')
         else:
             flash('Не удалось загрузить информацию о фильме', 'danger')
 
@@ -273,7 +394,7 @@ def edit_item(id):
         if status_from_form:
             item_to_edit.how_its_going = status_from_form
 
-        if rating_from_form:
+        if rating_from_form and rating_from_form.isdigit():
             item_to_edit.my_rating = int(rating_from_form)
 
         db.session.commit()
@@ -299,7 +420,6 @@ def delete_item(id):
 
 
 with app.app_context():
-    db.drop_all()
     db.create_all()
 
 if __name__ == '__main__':
