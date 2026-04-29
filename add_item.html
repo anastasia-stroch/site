@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Добавить{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <h2 class="text-center mb-4"><i class="bi bi-plus-circle"></i> Добавить</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Название *</label>
+            <input type="text" name="title" class="form-control" required placeholder="Название книги или фильма">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Описание</label>
+            <textarea name="description" class="form-control" rows="3" placeholder="Краткое описание"></textarea>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Тип</label>
+                <select name="item_type" class="form-select">
+                    <option value="book">📚 Книга</option>
+                    <option value="movie">🎬 Фильм</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Статус</label>
+                <select name="status" class="form-select">
+                    <option value="planned">○ В планах</option>
+                    <option value="completed">✓ Просмотрено/прочитано</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Рейтинг (1-5)</label>
+            <select name="rating" class="form-select">
+                <option value="">Не оценено</option>
+                <option value="1">⭐ 1</option>
+                <option value="2">⭐⭐ 2</option>
+                <option value="3">⭐⭐⭐ 3</option>
+                <option value="4">⭐⭐⭐⭐ 4</option>
+                <option value="5">⭐⭐⭐⭐⭐ 5</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2">
+            <i class="bi bi-check-circle"></i> Сохранить
+        </button>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary w-100 mt-2">Отмена</a>
+    </form>
+</div>
+{% endblock %}

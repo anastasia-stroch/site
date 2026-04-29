@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Регистрация{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <h2 class="text-center mb-4"><i class="bi bi-person-plus"></i> Регистрация</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Имя пользователя</label>
+            <input type="text" name="username" class="form-control" required placeholder="Ваше имя">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" required placeholder="your@email.com">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Пароль</label>
+            <input type="password" name="password" class="form-control" required minlength="6">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Подтвердите пароль</label>
+            <input type="password" name="confirm_password" class="form-control" required minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2">
+            <i class="bi bi-person-plus"></i> Зарегистрироваться
+        </button>
+    </form>
+    <p class="text-center mt-3 mb-0">
+        Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a>
+    </p>
+</div>
+{% endblock %}
