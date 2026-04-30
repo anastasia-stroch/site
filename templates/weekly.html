@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>📅 Еженедельник</h1>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>ПН</h3>
+    {% for t in monday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="monday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>ВТ</h3>
+    {% for t in tuesday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="tuesday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>СР</h3>
+    {% for t in wednesday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="wednesday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>ЧТ</h3>
+    {% for t in thursday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="thursday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>ПТ</h3>
+    {% for t in friday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="friday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>СБ</h3>
+    {% for t in saturday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="saturday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+<div style="border:1px solid #ccc; margin:10px; padding:10px;">
+    <h3>ВС</h3>
+    {% for t in sunday_tasks %}
+        <div>
+            <input type="checkbox" {% if t.is_done %}checked{% endif %}
+                   onchange="location.href='/weekly/toggle/{{ t.id }}'">
+            <span {% if t.is_done %}style="text-decoration:line-through"{% endif %}>{{ t.task_text }}</span>
+            <a href="/weekly/delete/{{ t.id }}" onclick="return confirm('Удалить?')">[x]</a>
+        </div>
+    {% endfor %}
+    <form method="POST" action="/weekly/add">
+        <input type="hidden" name="day" value="sunday">
+        <input type="text" name="task_text" required>
+        <button type="submit">+</button>
+    </form>
+</div>
+
+<a href="/">← Назад</a>
+{% endblock %}
