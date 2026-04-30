@@ -515,6 +515,98 @@ def export_csv():
     response.headers["Content-type"] = "text/csv"
     return response
 
+class WeeklyTask(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_text = db.Column(db.String(300), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False)  # 0=пн, 1=вт, ..., 6=вс
+    is_done = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='weekly_tasks')
+
+@app.route('/weekly')
+@login_required
+def weekly():
+    monday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=0).all()
+    tuesday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=1).all()
+    wednesday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=2).all()
+    thursday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=3).all()
+    friday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=4).all()
+    saturday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=5).all()
+    sunday_tasks = WeeklyTask.query.filter_by(user_id=current_user.id, day_of_week=6).all()
+
+    return render_template('weekly.html',
+                           monday_tasks=monday_tasks,
+                           tuesday_tasks=tuesday_tasks,
+                           wednesday_tasks=wednesday_tasks,
+                           thursday_tasks=thursday_tasks,
+                           friday_tasks=friday_tasks,
+                           saturday_tasks=saturday_tasks,
+                           sunday_tasks=sunday_tasks)
+
+
+@app.route('/weekly/add', methods=['POST'])
+@login_required
+def weekly_add():
+    day = request.form.get('day')
+    task_text = request.form.get('task_text')
+
+    if day == 'monday':
+        day_number = 0
+    elif day == 'tuesday':
+        day_number = 1
+    elif day == 'wednesday':
+        day_number = 2
+    elif day == 'thursday':
+        day_number = 3
+    elif day == 'friday':
+        day_number = 4
+    elif day == 'saturday':
+        day_number = 5
+    elif day == 'sunday':
+        day_number = 6
+    else:
+        day_number = 0
+
+    new_task = WeeklyTask(
+        user_id=current_user.id,
+        task_text=task_text,
+        day_of_week=day_number,
+        is_done=False
+    )
+    db.session.add(new_task)
+    db.session.commit()
+    flash('✅ Задача добавлена', 'success')
+    return redirect(url_for('weekly'))
+
+@app.route('/weekly/toggle/<int:task_id>')
+@login_required
+def weekly_toggle(task_id):
+    task = WeeklyTask.query.get_or_404(task_id)
+    if task.user_id != current_user.id:
+        flash('Не твоя задача!', 'danger')
+        return redirect(url_for('weekly'))
+    if task.is_done == True:
+        task.is_done = False
+    else:
+        task.is_done = True
+    db.session.commit()
+    flash('Статус изменен', 'info')
+    return redirect(url_for('weekly'))
+
+@app.route('/weekly/delete/<int:task_id>')
+@login_required
+def weekly_delete(task_id):
+    task = WeeklyTask.query.get_or_404(task_id)
+    if task.user_id != current_user.id:
+        flash('Не твоя задача!', 'danger')
+        return redirect(url_for('weekly'))
+
+    db.session.delete(task)
+    db.session.commit()
+    flash('Задача удалена', 'success')
+    return redirect(url_for('weekly'))
 
 with app.app_context():
     db.create_all()
