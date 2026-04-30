@@ -86,6 +86,9 @@ class MyItem(db.Model):
     my_rating = db.Column(db.Integer, nullable=True)
     user_who_owns = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date_when_created = db.Column(db.DateTime, default=datetime.utcnow)
+    poster_url = db.Column(db.String(500), default='')
+    date_watched = db.Column(db.DateTime, nullable=True)
+    is_favorite = db.Column(db.Boolean, default=False)
 
 
 @login_manager.user_loader
@@ -100,21 +103,24 @@ def search_movies_kinopoisk(query):
             return []
 
         for known_key, known_movie in KNOWN_MOVIES.items():
-            if query_lower in known_key or query_lower in [t.lower() for t in known_movie['alt_titles']]:
+            if query_lower in known_key or query_lower in [t.lower() for t in
+                                                           known_movie['alt_titles']]:
                 details = get_movie_details_kinopoisk(known_movie['id'])
                 if details:
                     return [{
                         'id': known_movie['id'],
                         'title': known_movie['title'],
                         'year': details.get('year', ''),
-                        'rating': details.get('rating', 'Нет рейтинга')
+                        'rating': details.get('rating', 'Нет рейтинга'),
+                        'poster': details.get('poster', '')
                     }]
                 else:
                     return [{
                         'id': known_movie['id'],
                         'title': known_movie['title'],
                         'year': '',
-                        'rating': 'Нет рейтинга'
+                        'rating': 'Нет рейтинга',
+                        'poster': ''
                     }]
 
         url = "https://api.kinopoisk.dev/v1.4/movie/search"
@@ -142,11 +148,13 @@ def search_movies_kinopoisk(query):
                         query_lower in name_alt.lower() or
                         query_lower in name_en.lower()):
                     title = name_ru or name_alt or name_en or 'Без названия'
+                    poster = movie.get('poster', {}).get('url', '') or ''
                     movies.append({
                         'id': movie.get('id'),
                         'title': title,
                         'year': movie.get('year', ''),
-                        'rating': movie.get('rating', {}).get('kp', 'Нет рейтинга')
+                        'rating': movie.get('rating', {}).get('kp', 'Нет рейтинга'),
+                        'poster': poster
                     })
             seen = set()
             unique_movies = []
@@ -162,6 +170,7 @@ def search_movies_kinopoisk(query):
     except Exception:
         return []
 
+
 def get_movie_details_kinopoisk(movie_id):
     try:
         url = f"https://api.kinopoisk.dev/v1.4/movie/{movie_id}"
@@ -175,7 +184,8 @@ def get_movie_details_kinopoisk(movie_id):
         if response.status_code == 200:
             data = response.json()
 
-            title = data.get('name') or data.get('alternativeName') or data.get('enName') or 'Без названия'
+            title = data.get('name') or data.get('alternativeName') or data.get(
+                'enName') or 'Без названия'
             year = data.get('year', '')
             genres = [genre.get('name', '') for genre in data.get('genres', [])]
             genre_str = ', '.join(genres) if genres else 'Неизвестно'
@@ -183,13 +193,16 @@ def get_movie_details_kinopoisk(movie_id):
             rating = rating_data.get('kp') or rating_data.get('imdb') or 'Нет рейтинга'
             if isinstance(rating, (int, float)):
                 rating = f"{rating:.1f}"
-            description = data.get('description') or data.get('shortDescription') or 'Описание не найдено'
+            description = data.get('description') or data.get(
+                'shortDescription') or 'Описание не найдено'
+            poster = data.get('poster', {}).get('url', '') or ''
             return {
                 'title': title,
                 'year': str(year) if year else '',
                 'genre': genre_str,
                 'rating': str(rating),
-                'description': description
+                'description': description,
+                'poster': poster
             }
         else:
             return None
@@ -200,18 +213,22 @@ def get_movie_details_kinopoisk(movie_id):
 @app.route('/')
 @login_required
 def index():
-    all_my_items = MyItem.query.filter_by(user_who_owns=current_user.id).order_by(MyItem.date_when_created.desc()).all()
+    all_my_items = MyItem.query.filter_by(user_who_owns=current_user.id).order_by(
+        MyItem.date_when_created.desc()).all()
     planned = sum(1 for item in all_my_items if item.how_its_going == 'plan')
     watching = sum(1 for item in all_my_items if item.how_its_going == 'watching')
     completed = sum(1 for item in all_my_items if item.how_its_going == 'completed')
     ratings = [item.my_rating for item in all_my_items if item.my_rating]
     avg_rating = sum(ratings) / len(ratings) if ratings else 0
+    favorites_count = sum(1 for item in all_my_items if item.is_favorite)
     return render_template('index.html',
                            items=all_my_items,
                            planned=planned,
                            watching=watching,
                            completed=completed,
-                           avg_rating=round(avg_rating, 1))
+                           avg_rating=round(avg_rating, 1),
+                           favorites_count=favorites_count)
+
 
 @app.route('/search_movies')
 def search_movies():
@@ -233,6 +250,7 @@ def get_movie_details_route():
     if details:
         return jsonify(details)
     return jsonify({'error': 'Not found'}), 404
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -301,12 +319,14 @@ def login():
 
     return render_template('login.html')
 
+
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     flash('Ты вышел из аккаунта', 'info')
     return redirect(url_for('login'))
+
 
 @app.route('/add', methods=['GET', 'POST'])
 @login_required
@@ -334,11 +354,13 @@ def add_item():
                 kinopoisk_rating=movie_data['rating'],
                 year=movie_data['year'],
                 how_its_going='plan',
-                user_who_owns=current_user.id
+                user_who_owns=current_user.id,
+                poster_url=movie_data.get('poster', '')
             )
             db.session.add(new_item)
             db.session.commit()
-            flash(f'✅ Фильм "{movie_data["title"]}" добавлен! Рейтинг КП: {movie_data["rating"]}', 'success')
+            flash(f'✅ Фильм "{movie_data["title"]}" добавлен! Рейтинг КП: {movie_data["rating"]}',
+                  'success')
         else:
             flash('❌ Не удалось загрузить информацию о фильме', 'danger')
 
@@ -359,10 +381,16 @@ def edit_item(id):
     if request.method == 'POST':
         status_from_form = request.form.get('status')
         rating_from_form = request.form.get('rating')
+        date_watched_str = request.form.get('date_watched')
         if status_from_form:
             item_to_edit.how_its_going = status_from_form
         if rating_from_form and rating_from_form.isdigit():
             item_to_edit.my_rating = int(rating_from_form)
+        if date_watched_str:
+            try:
+                item_to_edit.date_watched = datetime.strptime(date_watched_str, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                pass
 
         db.session.commit()
         flash('Изменения сохранены!', 'success')
@@ -382,6 +410,33 @@ def delete_item(id):
         flash('Нельзя удалить чужое!', 'danger')
     return redirect(url_for('index'))
 
+
+@app.route('/toggle_favorite/<int:id>')
+@login_required
+def toggle_favorite(id):
+    item_to_toggle = MyItem.query.get_or_404(id)
+    if item_to_toggle.user_who_owns == current_user.id:
+        item_to_toggle.is_favorite = not item_to_toggle.is_favorite
+        db.session.commit()
+        if item_to_toggle.is_favorite:
+            flash('Добавлено в избранное! ❤️', 'success')
+        else:
+            flash('Удалено из избранного', 'info')
+    else:
+        flash('Нельзя изменить чужое!', 'danger')
+    return redirect(url_for('index'))
+
+
+@app.route('/favorites')
+@login_required
+def favorites():
+    favorite_items = MyItem.query.filter_by(
+        user_who_owns=current_user.id,
+        is_favorite=True
+    ).order_by(MyItem.date_when_created.desc()).all()
+    return render_template('favorites.html', items=favorite_items)
+
+
 @app.route('/export/json')
 @login_required
 def export_json():
@@ -395,7 +450,10 @@ def export_json():
             'kinopoisk_rating': item.kinopoisk_rating,
             'my_rating': item.my_rating,
             'status': item.how_its_going,
-            'description': item.description
+            'description': item.description,
+            'poster_url': item.poster_url,
+            'date_watched': item.date_watched.isoformat() if item.date_watched else None,
+            'is_favorite': item.is_favorite
         })
 
     json_text = '[\n'
@@ -407,7 +465,10 @@ def export_json():
         json_text += f'    "kinopoisk_rating": "{film["kinopoisk_rating"]}",\n'
         json_text += f'    "my_rating": {film["my_rating"] if film["my_rating"] else "null"},\n'
         json_text += f'    "status": "{film["status"]}",\n'
-        json_text += f'    "description": "{film["description"].replace(chr(34), chr(92) + chr(34))}"\n'
+        json_text += f'    "description": "{film["description"].replace(chr(34), chr(92) + chr(34))}",\n'
+        json_text += f'    "poster_url": "{film["poster_url"]}",\n'
+        json_text += f'    "date_watched": "{film["date_watched"] if film["date_watched"] else ""}",\n'
+        json_text += f'    "is_favorite": {str(film["is_favorite"]).lower()}\n'
         json_text += '  }'
         if i < len(data) - 1:
             json_text += ','
@@ -420,12 +481,14 @@ def export_json():
     response.headers["Content-type"] = "application/json"
     return response
 
+
 @app.route('/export/csv')
 @login_required
 def export_csv():
     items = MyItem.query.filter_by(user_who_owns=current_user.id).all()
     csv_lines = []
-    csv_lines.append('Название,Год,Жанр,Рейтинг КП,Моя оценка,Статус,Описание')
+    csv_lines.append(
+        'Название,Год,Жанр,Рейтинг КП,Моя оценка,Статус,Описание,Постер,Дата просмотра,Избранное')
     for item in items:
         name = item.name if item.name else ''
         year = item.year if item.year else ''
@@ -441,13 +504,17 @@ def export_csv():
             status = 'Просмотрено'
         description = item.description if item.description else ''
         description = description.replace(',', ';').replace('\n', ' ').replace('"', "'")
-        line = f'{name},{year},{genre},{rating},{my_rating},{status},{description}'
+        poster = item.poster_url if item.poster_url else ''
+        date_watched = item.date_watched.strftime('%d.%m.%Y %H:%M') if item.date_watched else ''
+        favorite = 'Да' if item.is_favorite else 'Нет'
+        line = f'{name},{year},{genre},{rating},{my_rating},{status},{description},{poster},{date_watched},{favorite}'
         csv_lines.append(line)
     csv_text = '\n'.join(csv_lines)
     response = make_response(csv_text)
     response.headers["Content-Disposition"] = "attachment; filename=my_films.csv"
     response.headers["Content-type"] = "text/csv"
     return response
+
 
 with app.app_context():
     db.create_all()
