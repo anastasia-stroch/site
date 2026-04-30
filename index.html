@@ -1,60 +1,51 @@
 {% extends 'base.html' %}
-{% block title %}Мой список{% endblock %}
-
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="text-white"><i class="bi bi-collection-play"></i> Мой список</h1>
-    <a href="{{ url_for('add_item') }}" class="btn btn-light btn-lg">
-        <i class="bi bi-plus-circle"></i> Добавить
-    </a>
+<h2>🎬 Моя коллекция фильмов</h2>
+<p>Здесь собраны все твои любимые фильмы</p>
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    <span class="badge bg-info fs-6">📌 {{ planned }} В планах</span>
+    <span class="badge bg-warning fs-6">▶️ {{ watching }} Смотрю</span>
+    <span class="badge bg-success fs-6">✅ {{ completed }} Просмотрено</span>
+    <span class="badge bg-primary fs-6">⭐ {{ avg_rating }} Средняя оценка</span>
 </div>
-
+<div class="mb-4">
+    <a href="/add" class="btn btn-success">➕ Добавить фильм</a>
+    <a href="/export/json" class="btn btn-outline-primary">📄 Экспорт JSON</a>
+    <a href="/export/csv" class="btn btn-outline-secondary">📊 Экспорт CSV</a>
+</div>
 {% if items|length == 0 %}
-<div class="text-center text-white py-5">
-    <i class="bi bi-inbox display-1"></i>
-    <h3 class="mt-3">Список пуст</h3>
-    <p>Добавьте первую книгу или фильм!</p>
-    <a href="{{ url_for('add_item') }}" class="btn btn-light btn-lg mt-3">
-        <i class="bi bi-plus-circle"></i> Добавить
-    </a>
-</div>
-{% else %}
-<div class="row">
-    {% for item in items %}
-    <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge badge-type bg-{{ 'primary' if item.item_type == 'book' else 'info' }}">
-                        <i class="bi bi-{{ 'book' if item.item_type == 'book' else 'film' }}"></i>
-                        {{ 'Книга' if item.item_type == 'book' else 'Фильм' }}
-                    </span>
-                    <span class="badge badge-type bg-{{ 'success' if item.status == 'completed' else 'warning' }}">
-                        {{ '✓ Готово' if item.status == 'completed' else '○ В планах' }}
-                    </span>
-                </div>
-                <h5 class="card-title">{{ item.title }}</h5>
-                <p class="card-text text-muted">{{ item.description or 'Нет описания' }}</p>
-                {% if item.rating %}
-                <div class="rating-stars mb-2">
-                    {% for i in range(5) %}
-                        <i class="bi bi-star{{ '-fill' if i < item.rating else '' }}"></i>
-                    {% endfor %}
-                    <span class="text-muted ms-2">({{ item.rating }}/5)</span>
-                </div>
-                {% endif %}
-            </div>
-            <div class="card-footer bg-white border-0 pb-3">
-                <a href="{{ url_for('edit_item', id=item.id) }}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-pencil"></i> Изменить
-                </a>
-                <a href="{{ url_for('delete_item', id=item.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить?')">
-                    <i class="bi bi-trash"></i> Удалить
-                </a>
-            </div>
-        </div>
+    <div class="alert alert-info">
+        <h4>📭 Коллекция пуста</h4>
+        <p>Добавь свой первый фильм, нажав на кнопку выше!</p>
     </div>
-    {% endfor %}
-</div>
+{% else %}
+    <div class="row">
+        {% for item in items %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ item.name }} {% if item.year %}<small class="text-muted">({{ item.year }})</small>{% endif %}</h5>
+                        {% if item.genre and item.genre != 'Неизвестно' %}
+                            <p class="card-text"><strong>Жанр:</strong> {{ item.genre[:50] }}</p>
+                        {% endif %}
+                        {% if item.kinopoisk_rating %}
+                            <p class="card-text">⭐ Рейтинг КП: {{ item.kinopoisk_rating }}</p>
+                        {% endif %}
+                        {% if item.description %}
+                            <p class="card-text">📝 Описание: {{ item.description[:150] }}{% if item.description|length > 150 %}...{% endif %}</p>
+                        {% endif %}
+                        <p class="card-text">📌 Статус: {% if item.how_its_going == 'plan' %}📌 В планах{% elif item.how_its_going == 'watching' %}▶️ Смотрю{% else %}✅ Просмотрено{% endif %}</p>
+                        {% if item.my_rating %}
+                            <p class="card-text">⭐ Моя оценка: {% for i in range(item.my_rating) %}★{% endfor %}{% for i in range(5 - item.my_rating) %}☆{% endfor %} {{ item.my_rating }}/5</p>
+                        {% endif %}
+                        <div class="d-flex gap-2">
+                            <a href="/edit/{{ item.id }}" class="btn btn-sm btn-outline-primary">✏️ Изменить</a>
+                            <a href="/delete/{{ item.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Точно удалить?')">🗑️ Удалить</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
 {% endif %}
 {% endblock %}
