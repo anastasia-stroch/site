@@ -1,47 +1,35 @@
 {% extends 'base.html' %}
-{% block title %}Изменить{% endblock %}
-
 {% block content %}
-<div class="auth-card">
-    <h2 class="text-center mb-4"><i class="bi bi-pencil"></i> Изменить</h2>
-    <form method="POST">
-        <div class="mb-3">
-            <label class="form-label">Название</label>
-            <input type="text" name="title" class="form-control" value="{{ item.title }}" required>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Описание</label>
-            <textarea name="description" class="form-control" rows="3">{{ item.description or '' }}</textarea>
-        </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Тип</label>
-                <select name="item_type" class="form-select">
-                    <option value="book" {{ 'selected' if item.item_type == 'book' }}>📚 Книга</option>
-                    <option value="movie" {{ 'selected' if item.item_type == 'movie' }}>🎬 Фильм</option>
-                </select>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Статус</label>
-                <select name="status" class="form-select">
-                    <option value="planned" {{ 'selected' if item.status == 'planned' }}>○ В планах</option>
-                    <option value="completed" {{ 'selected' if item.status == 'completed' }}>✓ Просмотрено/прочитано</option>
-                </select>
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Рейтинг (1-5)</label>
-            <select name="rating" class="form-select">
-                <option value="" {{ 'selected' if not item.rating }}>Не оценено</option>
-                {% for i in range(1, 6) %}
-                <option value="{{ i }}" {{ 'selected' if item.rating == i }}>⭐ {{ i }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary w-100 py-2">
-            <i class="bi bi-check-circle"></i> Сохранить изменения
-        </button>
-        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary w-100 mt-2">Отмена</a>
-    </form>
-</div>
+<h2>✏️ Редактировать {{ item.name }}</h2>
+<form method="POST" class="card p-3">
+    <div class="mb-3">
+        <label class="form-label">📌 Статус просмотра:</label>
+        <select name="status" class="form-select">
+            <option value="plan" {% if item.how_its_going=='plan' %}selected{% endif %}>📌 В планах</option>
+            <option value="watching" {% if item.how_its_going=='watching' %}selected{% endif %}>▶️ Смотрю сейчас</option>
+            <option value="completed" {% if item.how_its_going=='completed' %}selected{% endif %}>✅ Просмотрено</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">⭐ Моя оценка (1-5):</label>
+        <select name="rating" class="form-select">
+            <option value="" {% if not item.my_rating %}selected{% endif %}>Не оценено</option>
+            <option value="1" {% if item.my_rating==1 %}selected{% endif %}>⭐ 1 - Ужасно</option>
+            <option value="2" {% if item.my_rating==2 %}selected{% endif %}>⭐⭐ 2 - Плохо</option>
+            <option value="3" {% if item.my_rating==3 %}selected{% endif %}>⭐⭐⭐ 3 - Нормально</option>
+            <option value="4" {% if item.my_rating==4 %}selected{% endif %}>⭐⭐⭐⭐ 4 - Хорошо</option>
+            <option value="5" {% if item.my_rating==5 %}selected{% endif %}>⭐⭐⭐⭐⭐ 5 - Отлично</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">📝 Заметки:</label>
+        <textarea name="notes" class="form-control" rows="3">{{ item.notes }}</textarea>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">👁️ Количество просмотров:</label>
+        <input type="number" name="watch_count" class="form-control" value="{{ item.watch_count }}" min="0">
+    </div>
+    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+    <a href="/" class="btn btn-secondary ms-2">← Назад</a>
+</form>
 {% endblock %}
