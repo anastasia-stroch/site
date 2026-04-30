@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 style="margin-bottom: 10px;">🔑 Вход</h1>
+<p style="color: #6b7280; margin-bottom: 30px;">Войдите в свою коллекцию</p>
+
+<form method="POST" style="max-width: 500px;">
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Email:</label>
+        <input type="email" name="email" required
+               style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Пароль:</label>
+        <input type="password" name="password" required
+               style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+            <input type="checkbox" name="remember"
+                   style="width: 18px; height: 18px; margin-right: 10px; cursor: pointer;">
+            <span style="color: #4b5563;">Запомнить меня</span>
+        </label>
+    </div>
+
+    <button type="submit"
+            style="width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 20px;">
+        🔓 Войти
+    </button>
+</form>
+
+<p style="text-align: center; color: #6b7280;">
+    Нет аккаунта? <a href="/register" style="color: #667eea; font-weight: 600; text-decoration: none;">Зарегистрироваться</a>
+</p>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 style="margin-bottom: 30px;">➕ Добавить фильм</h1>
+
+<div id="searchSection" style="margin-bottom: 30px;">
+    <input type="text" id="searchInput" placeholder="Введите название фильма..."
+           style="width: 100%; padding: 15px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px; margin-bottom: 20px;">
+
+    <div id="searchResults" style="display: grid; gap: 15px;"></div>
+</div>
+
+<div id="movieDetails"
+     style="display: none; background: #f9fafb; padding: 25px; border-radius: 12px; margin-bottom: 20px;">
+    <div id="posterContainer" style="text-align: center; margin-bottom: 20px;"></div>
+
+    <h3 id="detailTitle" style="margin-bottom: 15px; color: #1f2937;"></h3>
+
+    <div style="margin-bottom: 12px;">
+        <strong>Год:</strong> <span id="detailYear"></span>
+    </div>
+
+    <div style="margin-bottom: 12px;">
+        <strong>Жанр:</strong> <span id="detailGenre"></span>
+    </div>
+
+    <div style="margin-bottom: 12px;">
+        <strong>Рейтинг:</strong> ⭐ <span id="detailRating"></span>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <strong>Описание:</strong>
+        <p id="detailDescription" style="margin-top: 8px; color: #4b5563; line-height: 1.6;"></p>
+    </div>
+
+    <form method="POST" id="addForm">
+        <input type="hidden" name="selected_id" id="selectedId">
+        <button type="submit"
+                style="width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;">
+            Добавить
+        </button>
+    </form>
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="/"
+       style="display: inline-block; padding: 12px 25px; background: #6b7280; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+        ← Назад
+    </a>
+</div>
+
+<script>
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+        const movieDetails = document.getElementById('movieDetails');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                searchResults.innerHTML = '';
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                fetch(`/search_movies?query=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(movies => {
+                        displayResults(movies);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            }, 500);
+        });
+
+        function displayResults(movies) {
+            if (movies.length === 0) {
+                searchResults.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">Ничего не найдено</div>';
+                return;
+            }
+
+            searchResults.innerHTML = movies.map(movie => `
+                <div onclick="showMovieDetails('${movie.id}')"
+                     style="padding: 15px; background: white; border-radius: 8px; cursor: pointer; transition: all 0.2s; border: 2px solid transparent;"
+                     onmouseover="this.style.borderColor='#667eea'; this.style.transform='translateY(-2px)';"
+                     onmouseout="this.style.borderColor='transparent'; this.style.transform='translateY(0)';">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        ${movie.poster ? `<img src="${movie.poster}" style="width: 60px; height: 90px; object-fit: cover; border-radius: 6px;">` : ''}
+                        <div>
+                            <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">${movie.title}</div>
+                            <div style="color: #6b7280; font-size: 14px;">
+                                ${movie.year || 'Год неизвестен'} • ⭐ ${movie.rating || 'Нет рейтинга'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showMovieDetails(movieId) {
+            fetch(`/get_movie_details?id=${movieId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Ошибка при загрузке данных');
+                        return;
+                    }
+
+                    document.getElementById('selectedId').value = movieId;
+                    document.getElementById('detailTitle').textContent = data.title;
+                    document.getElementById('detailYear').textContent = data.year || 'Неизвестен';
+                    document.getElementById('detailGenre').textContent = data.genre;
+                    document.getElementById('detailRating').textContent = data.rating;
+                    document.getElementById('detailDescription').textContent = data.description;
+
+                    if (data.poster) {
+                        document.getElementById('posterContainer').innerHTML = `
+                            <img src="${data.poster}" style="max-width: 200px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        `;
+                    } else {
+                        document.getElementById('posterContainer').innerHTML = '';
+                    }
+
+                    movieDetails.style.display = 'block';
+                    movieDetails.scrollIntoView({ behavior: 'smooth' });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Ошибка при загрузке данных о фильме');
+                });
+        }
+
+</script>
+{% endblock %}

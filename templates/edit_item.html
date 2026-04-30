@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 style="margin-bottom: 20px;">✏️ Редактировать</h1>
+<h2 style="color: #667eea; margin-bottom: 30px;">{{ item.name }}</h2>
+
+<form method="POST" style="max-width: 500px;">
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">📌 Статус
+            просмотра:</label>
+        <select name="status"
+                style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+            <option value="plan" {% if item.how_its_going==
+            'plan' %}selected{% endif %}>📌 В планах</option>
+            <option value="watching" {% if item.how_its_going==
+            'watching' %}selected{% endif %}>▶️ Смотрю сейчас</option>
+            <option value="completed" {% if item.how_its_going==
+            'completed' %}selected{% endif %}>✅ Просмотрено</option>
+        </select>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">⭐ Моя оценка (1-5):</label>
+        <select name="rating"
+                style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+            <option value="">Не оценено</option>
+            <option value="1" {% if item.my_rating== 1 %}selected{% endif %}>⭐ 1 - Ужасно</option>
+            <option value="2" {% if item.my_rating== 2 %}selected{% endif %}>⭐⭐ 2 - Плохо</option>
+            <option value="3" {% if item.my_rating== 3 %}selected{% endif %}>⭐⭐⭐ 3 - Нормально</option>
+            <option value="4" {% if item.my_rating== 4 %}selected{% endif %}>⭐⭐⭐⭐ 4 - Хорошо</option>
+            <option value="5" {% if item.my_rating== 5 %}selected{% endif %}>⭐⭐⭐⭐⭐ 5 - Отлично</option>
+        </select>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">📅 Дата просмотра:</label>
+        <input type="datetime-local" name="date_watched"
+               value="{{ item.date_watched.strftime('%Y-%m-%dT%H:%M') if item.date_watched else '' }}"
+               style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 16px;">
+    </div>
+
+    <div style="display: flex; gap: 15px; margin-top: 30px;">
+        <a href="/"
+           style="flex: 1; padding: 12px; background: #6b7280; color: white; text-decoration: none; border-radius: 8px; text-align: center; font-weight: 600;">
+            ← Назад
+        </a>
+        <button type="submit"
+                style="flex: 1; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;">
+            💾 Сохранить
+        </button>
+    </div>
+</form>
+{% endblock %}

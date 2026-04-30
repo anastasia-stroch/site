@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 style="margin-bottom: 10px;">❤️ Избранное</h1>
+<p style="color: #6b7280; margin-bottom: 30px;">Твои любимые фильмы</p>
+
+{% if items|length == 0 %}
+<div style="text-align: center; padding: 60px 20px;">
+    <div style="font-size: 64px; margin-bottom: 20px;">🤍</div>
+    <h2 style="color: #374151; margin-bottom: 10px;">Список избранного пуст</h2>
+    <p style="color: #6b7280; margin-bottom: 20px;">Нажми на сердечко рядом с фильмом, чтобы добавить его в
+        избранное</p>
+    <a href="/"
+       style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+        🎬 Перейти к коллекции
+    </a>
+</div>
+{% else %}
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 25px;">
+    {% for item in items %}
+    <div style="background: #f9fafb; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: relative;">
+        {% if item.poster_url %}
+        <div style="margin-bottom: 15px; text-align: center;">
+            <img src="{{ item.poster_url }}" alt="{{ item.name }}"
+                 style="max-width: 200px; max-height: 300px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        </div>
+        {% endif %}
+
+        <div style="position: absolute; top: 15px; right: 15px;">
+            <a href="/toggle_favorite/{{ item.id }}"
+               style="text-decoration: none; font-size: 24px; transition: transform 0.2s; display: inline-block;">
+                ❤️
+            </a>
+        </div>
+
+        <h3 style="color: #1f2937; margin-bottom: 8px; font-size: 20px; padding-right: 40px;">{{ item.name }}</h3>
+        <div style="color: #6b7280; font-size: 14px; margin-bottom: 12px;">
+            {{ item.year }} • {{ item.genre[:50] }}
+        </div>
+
+        {% if item.kinopoisk_rating %}
+        <div style="background: white; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; display: inline-block;">
+            ⭐ Рейтинг КП: <strong>{{ item.kinopoisk_rating }}</strong>
+        </div>
+        {% endif %}
+
+        {% if item.description %}
+        <div style="color: #4b5563; font-size: 14px; margin-bottom: 12px; line-height: 1.5;">
+            📝 Описание: {{ item.description[:150] }}{% if item.description|length > 150 %}...{% endif %}
+        </div>
+        {% endif %}
+
+        <div style="background: white; padding: 10px 12px; border-radius: 6px; margin-bottom: 10px;">
+            📌 Статус:
+            <strong>
+                {% if item.how_its_going == 'plan' %}📌 В планах
+                {% elif item.how_its_going == 'watching' %}▶️ Смотрю
+                {% else %}✅ Просмотрено{% endif %}
+            </strong>
+        </div>
+
+        {% if item.my_rating %}
+        <div style="background: white; padding: 10px 12px; border-radius: 6px; margin-bottom: 10px;">
+            ⭐ Моя оценка:
+            <span style="color: #fbbf24;">
+                                {% for i in range(item.my_rating) %}★{% endfor %}
+                                {% for i in range(5 - item.my_rating) %}☆{% endfor %}
+                            </span>
+            <strong>{{ item.my_rating }}/5</strong>
+        </div>
+        {% endif %}
+
+        {% if item.date_watched %}
+        <div style="background: white; padding: 10px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 14px;">
+            📅 Дата просмотра: <strong>{{ item.date_watched.strftime('%d.%m.%Y %H:%M') }}</strong>
+        </div>
+        {% endif %}
+
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <a href="/edit/{{ item.id }}"
+               style="flex: 1; background: #3b82f6; color: white; padding: 10px; border-radius: 6px; text-decoration: none; text-align: center; font-weight: 600;">
+                ✏️ Изменить
+            </a>
+            <a href="/delete/{{ item.id }}"
+               style="flex: 1; background: #ef4444; color: white; padding: 10px; border-radius: 6px; text-decoration: none; text-align: center; font-weight: 600;"
+               onclick="return confirm('Удалить этот фильм?')">
+                🗑️ Удалить
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="margin-top: 30px;">
+    <a href="/"
+       style="display: inline-block; padding: 12px 25px; background: #6b7280; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+        ← Назад к коллекции
+    </a>
+</div>
+{% endblock %}
