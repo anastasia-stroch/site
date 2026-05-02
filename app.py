@@ -95,13 +95,11 @@ class MyItem(db.Model):
 def load_this_user(user_id):
     return User.query.get(int(user_id))
 
-
 def search_movies_kinopoisk(query):
     try:
         query_lower = query.strip().lower()
         if len(query_lower) < 2:
             return []
-
         for known_key, known_movie in KNOWN_MOVIES.items():
             if query_lower in known_key or query_lower in [t.lower() for t in
                                                            known_movie['alt_titles']]:
@@ -327,7 +325,6 @@ def logout():
     flash('Ты вышел из аккаунта', 'info')
     return redirect(url_for('login'))
 
-
 @app.route('/add', methods=['GET', 'POST'])
 @login_required
 def add_item():
@@ -359,10 +356,10 @@ def add_item():
             )
             db.session.add(new_item)
             db.session.commit()
-            flash(f'✅ Фильм "{movie_data["title"]}" добавлен! Рейтинг КП: {movie_data["rating"]}',
+            flash(f'Фильм "{movie_data["title"]}" добавлен! Рейтинг: {movie_data["rating"]}',
                   'success')
         else:
-            flash('❌ Не удалось загрузить информацию о фильме', 'danger')
+            flash('Не удалось загрузить информацию о фильме', 'danger')
 
         return redirect(url_for('index'))
 
@@ -591,9 +588,11 @@ def weekly_toggle(task_id):
         task.is_done = False
     else:
         task.is_done = True
+
     db.session.commit()
     flash('Статус изменен', 'info')
     return redirect(url_for('weekly'))
+
 
 @app.route('/weekly/delete/<int:task_id>')
 @login_required
@@ -610,6 +609,288 @@ def weekly_delete(task_id):
 
 with app.app_context():
     db.create_all()
+
+@app.route('/weekly')
+@login_required
+def weekly_plan():
+    from datetime import datetime, timedelta
+
+    today = datetime.now().date()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+
+    new_this_week = MyItem.query.filter(
+        MyItem.user_who_owns == current_user.id,
+        db.func.date(MyItem.date_when_created) >= start_of_week
+    ).all()
+
+    planned_movies = MyItem.query.filter_by(
+        user_who_owns=current_user.id,
+        how_its_going='plan'
+    ).order_by(MyItem.date_when_created).all()
+
+    all_user_movie_names = [item.name.lower() for item in MyItem.query.filter_by(user_who_owns=current_user.id).all()]
+    recommendations = []
+    for key, movie in KNOWN_MOVIES.items():
+        if movie['title'].lower() not in all_user_movie_names:
+            details = get_movie_details_kinopoisk(movie['id'])
+            if details and details.get('rating') and details['rating'] != 'Нет рейтинга':
+                try:
+                    rating = float(details['rating'])
+                    if rating >= 8.0:
+                        recommendations.append({
+                            'title': movie['title'],
+                            'rating': details['rating'],
+                            'year': details.get('year', ''),
+                            'id': movie['id']
+                        })
+                except:
+                    pass
+
+    return render_template('weekly.html',
+                           new_this_week=new_this_week,
+                           planned_movies=planned_movies[:10],
+                           recommendations=recommendations[:5],
+                           start_of_week=start_of_week,
+                           end_of_week=end_of_week)
+
+
+@app.route('/advanced_search', methods=['GET', 'POST'])
+@login_required
+def advanced_search():
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip().lower()
+        genre = request.form.get('genre', '').strip().lower()
+        min_rating = request.form.get('min_rating', '')
+        status = request.form.get('status', '')
+        query = MyItem.query.filter_by(user_who_owns=current_user.id)
+        if title:
+            query = query.filter(MyItem.name.ilike(f'%{title}%'))
+        if genre:
+            query = query.filter(MyItem.genre.ilike(f'%{genre}%'))
+        if status:
+            query = query.filter(MyItem.how_its_going == status)
+        if min_rating and min_rating.isdigit():
+            query = query.filter(MyItem.my_rating >= int(min_rating))
+
+        results = query.order_by(MyItem.date_when_created.desc()).all()
+        return render_template('advanced_search.html', results=results, search_performed=True)
+
+    return render_template('advanced_search.html', results=None, search_performed=False)
+
+
+@app.route('/movies/random')
+@login_required
+def random_movie():
+    import random
+    status_filter = request.args.get('status', 'all')
+    query = MyItem.query.filter_by(user_who_owns=current_user.id)
+    if status_filter == 'plan':
+        query = query.filter_by(how_its_going='plan')
+    elif status_filter == 'watching':
+        query = query.filter_by(how_its_going='watching')
+    elif status_filter == 'completed':
+        query = query.filter_by(how_its_going='completed')
+    elif status_filter == 'favorite':
+        query = query.filter_by(is_favorite=True)
+    movies = query.all()
+    if not movies:
+        return jsonify({'error': 'Нет фильмов для выбора'}), 404
+    movie = random.choice(movies)
+    return jsonify({
+        'id': movie.id,
+        'name': movie.name,
+        'year': movie.year,
+        'genre': movie.genre,
+        'my_rating': movie.my_rating,
+        'kinopoisk_rating': movie.kinopoisk_rating,
+        'status': movie.how_its_going,
+        'poster_url': movie.poster_url
+    })
+
+@app.route('/random')
+@login_required
+def random_movie_page():
+    return render_template('random_movie.html')
+
+@app.route('/movies/recent')
+@login_required
+def recent_movies():
+    limit = request.args.get('limit', 10, type=int)
+    recent = MyItem.query.filter_by(user_who_owns=current_user.id) \
+        .order_by(MyItem.date_when_created.desc()) \
+        .limit(limit).all()
+    return jsonify([{
+        'id': m.id,
+        'name': m.name,
+        'year': m.year,
+        'rating': m.my_rating,
+        'date_added': m.date_when_created.strftime('%d.%m.%Y %H:%M'),
+        'status': m.how_its_going
+    } for m in recent])
+
+
+@app.route('/movies/top_rated')
+@login_required
+def top_rated_movies():
+    limit = request.args.get('limit', 10, type=int)
+    movies = MyItem.query.filter_by(
+        user_who_owns=current_user.id
+    ).filter(
+        MyItem.my_rating.isnot(None)
+    ).order_by(
+        MyItem.my_rating.desc(),
+        MyItem.kinopoisk_rating.desc()
+    ).limit(limit).all()
+
+    return jsonify([{
+        'id': m.id,
+        'name': m.name,
+        'my_rating': m.my_rating,
+        'kinopoisk_rating': m.kinopoisk_rating,
+        'year': m.year
+    } for m in movies])
+
+
+@app.route('/export/custom')
+@login_required
+def export_custom():
+    items = MyItem.query.filter_by(user_who_owns=current_user.id).all()
+    format_type = request.args.get('format', 'json')
+    fields = request.args.getlist('fields')
+    if not fields:
+        fields = ['name', 'year', 'genre', 'kinopoisk_rating', 'my_rating', 'status']
+    data = []
+    for item in items:
+        row = {}
+        if 'name' in fields:
+            row['name'] = item.name
+        if 'year' in fields:
+            row['year'] = item.year
+        if 'genre' in fields:
+            row['genre'] = item.genre
+        if 'kinopoisk_rating' in fields:
+            row['kinopoisk_rating'] = item.kinopoisk_rating
+        if 'my_rating' in fields:
+            row['my_rating'] = item.my_rating
+        if 'status' in fields:
+            status_map = {'plan': 'В планах', 'watching': 'Смотрю', 'completed': 'Просмотрено'}
+            row['status'] = status_map.get(item.how_its_going, item.how_its_going)
+        if 'date_added' in fields:
+            row['date_added'] = item.date_when_created.strftime('%d.%m.%Y') if item.date_when_created else ''
+        data.append(row)
+
+    if format_type == 'csv':
+        import csv
+        from io import StringIO
+        output = StringIO()
+        if data:
+            writer = csv.DictWriter(output, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(data)
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=custom_export.csv"
+        response.headers["Content-type"] = "text/csv"
+        return response
+    else:
+        return jsonify(data)
+
+@app.route('/movies/bulk_delete', methods=['POST'])
+@login_required
+def bulk_delete():
+    ids = request.json.get('ids', [])
+    if not ids:
+        return jsonify({'error': 'Не указаны ID'}), 400
+
+    deleted_count = 0
+    for movie_id in ids:
+        movie = MyItem.query.get(movie_id)
+        if movie and movie.user_who_owns == current_user.id:
+            db.session.delete(movie)
+            deleted_count += 1
+
+    db.session.commit()
+    return jsonify({'deleted': deleted_count, 'success': True})
+
+@app.route('/movies/stats/years')
+@login_required
+def yearly_stats_simple():
+    items = MyItem.query.filter_by(user_who_owns=current_user.id).all()
+
+    yearly = {}
+    for item in items:
+        if item.date_when_created:
+            year = item.date_when_created.year
+            if year not in yearly:
+                yearly[year] = 0
+            yearly[year] += 1
+
+    return jsonify(yearly)
+
+@app.route('/api/simple_stats')
+@login_required
+def simple_stats():
+    items = MyItem.query.filter_by(user_who_owns=current_user.id).all()
+    genre_count = {}
+    for item in items:
+        genres = item.genre.split(', ')
+        for g in genres:
+            if g and g != 'Неизвестно':
+                genre_count[g] = genre_count.get(g, 0) + 1
+    return jsonify({
+        'total': len(items),
+        'favorites': sum(1 for i in items if i.is_favorite),
+        'completed': sum(1 for i in items if i.how_its_going == 'completed'),
+        'top_genres': dict(sorted(genre_count.items(), key=lambda x: x[1], reverse=True)[:5])
+    })
+
+@app.route('/stats')
+@login_required
+def stats():
+    user_id = current_user.id
+    films = MyItem.query.filter_by(user_who_owns=user_id).all()
+    total = 0
+    watched = 0
+    watching = 0
+    fav = 0
+    rates = []
+    for f in films:
+        total = total + 1
+        if f.how_its_going == 'completed':
+            watched = watched + 1
+        elif f.how_its_going == 'watching':
+            watching = watching + 1
+        if f.is_favorite == True:
+            fav = fav + 1
+        if f.my_rating != None:
+            rates.append(f.my_rating)
+    if len(rates) > 0:
+        sum_rates = 0
+        for r in rates:
+            sum_rates = sum_rates + r
+        avg = round(sum_rates / len(rates), 1)
+    else:
+        avg = 0
+    top = MyItem.query.filter_by(user_who_owns=user_id).filter(MyItem.my_rating.isnot(None)).order_by(MyItem.my_rating.desc()).limit(5).all()
+    gen = {}
+    for f in films:
+        if f.genre != None and f.genre != 'Неизвестно':
+            g_list = f.genre.split(', ')
+            for g in g_list:
+                g = g.strip()
+                if g != '':
+                    if g in gen:
+                        gen[g] = gen[g] + 1
+                    else:
+                        gen[g] = 1
+    return render_template('stats.html',
+                         total=total,
+                         watched=watched,
+                         watching=watching,
+                         favorites=fav,
+                         avg_rating=avg,
+                         top_rated=top,
+                         genres=gen.items())
 
 if __name__ == '__main__':
     app.run(debug=True)
