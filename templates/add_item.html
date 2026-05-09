@@ -115,16 +115,13 @@
                     document.getElementById('detailGenre').textContent = data.genre;
                     document.getElementById('detailRating').textContent = data.rating;
                     document.getElementById('detailDescription').textContent = data.description;
-
                     if (data.poster) {
                         document.getElementById('posterContainer').innerHTML = `
                             <img src="${data.poster}" style="max-width: 200px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                         `;
                     } else {
                         document.getElementById('posterContainer').innerHTML = '';
-                    }
-
-                    movieDetails.style.display = 'block';
+                    }movieDetails.style.display = 'block';
                     movieDetails.scrollIntoView({ behavior: 'smooth' });
                 })
                 .catch(error => {
@@ -132,7 +129,5 @@
                     alert('Ошибка при загрузке данных о фильме');
                 });
         }
-
-
 </script>
 {% endblock %}
