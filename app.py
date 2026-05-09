@@ -14,7 +14,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-YOUR_KINOPOISK_API_KEY = 'SWK920Y-8SMMJ4B-PM0TR2N-YWW9YFY'
+YOUR_KINOPOISK_API_KEY = 'F991BQQ-7A34Q3F-G436TFT-K1GSRC9'
 
 KNOWN_MOVIES = {
     'зеленая книга': {
