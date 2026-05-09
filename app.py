@@ -907,5 +907,120 @@ def stats():
                          top_rated=top,
                          genres=gen.items())
 
+def calc_movie_stat(user_id):
+    movies = MyItem.query.filter_by(user_who_owns=user_id).all()
+    total_movies = 0
+    total_rating_sum = 0
+    movies_w_rat = 0
+    fav_count = 0
+    completed_count = 0
+    watching_count = 0
+    plan_count = 0
+    for movie in movies:
+        total_movies = total_movies + 1
+        if movie.is_favorite == True:
+            fav_count = fav_count + 1
+        if movie.how_its_going == 'completed':
+            completed_count = completed_count + 1
+        elif movie.how_its_going == 'watching':
+            watching_count = watching_count + 1
+        elif movie.how_its_going == 'plan':
+            plan_count = plan_count + 1
+        if movie.my_rating is not None:
+            movies_w_rat = movies_w_rat + 1
+            total_rating_sum = total_rating_sum + movie.my_rating
+    if movies_w_rat > 0:
+        average_rating = total_rating_sum / movies_w_rat
+    else:
+        average_rating = 0
+    year_dict = {}
+    for movie in movies:
+        if movie.year and movie.year.isdigit():
+            year = int(movie.year)
+            if year in year_dict:
+                year_dict[year] = year_dict[year] + 1
+            else:
+                year_dict[year] = 1
+    most_common_year = None
+    max_count = 0
+    for year, count in year_dict.items():
+        if count > max_count:
+            max_count = count
+            most_common_year = year
+    genre_dict = {}
+    for movie in movies:
+        if movie.genre and movie.genre != 'Неизвестно':
+            genres_list = movie.genre.split(', ')
+            for genre in genres_list:
+                genre = genre.strip()
+                if genre in genre_dict:
+                    genre_dict[genre] = genre_dict[genre] + 1
+                else:
+                    genre_dict[genre] = 1
+    top_genres = []
+    for genre, count in genre_dict.items():
+        top_genres.append((genre, count))
+    for i in range(len(top_genres)):
+        for j in range(i + 1, len(top_genres)):
+            if top_genres[j][1] > top_genres[i][1]:
+                temp = top_genres[i]
+                top_genres[i] = top_genres[j]
+                top_genres[j] = temp
+    top_3_genres = top_genres[:3]
+    result = {
+        'total': total_movies,
+        'average_rating': round(average_rating, 1),
+        'favorites': fav_count,
+        'completed': completed_count,
+        'watching': watching_count,
+        'plan': plan_count,
+        'most_common_year': most_common_year,
+        'top_genres': top_3_genres
+    }
+    return result
+
+def val_save_moviedat(movie_id, user_id, status, rating, date_watched_str):
+    err = []
+    if not movie_id:
+        err.append('ID фильма не может быть пустым')
+    if not user_id:
+        err.append('ID пользователя не может быть пустым')
+    if status not in ['plan', 'watching', 'completed']:
+        err.append('Статус должен быть plan, watching или completed')
+    if rating is not None and rating != '':
+        try:
+            rating_int = int(rating)
+            if rating_int < 1 or rating_int > 5:
+                err.append('Оценка должна быть от 1 до 5')
+        except ValueError:
+            rating_int = None
+            err.append('Оценка должна быть числом')
+    else:
+        rating_int = None
+    date_watched_obj = None
+    if date_watched_str and date_watched_str != '':
+        try:
+            date_watched_obj = datetime.strptime(date_watched_str, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            err.append('Неверный формат даты')
+    if len(err) > 0:
+        return {'success': False, 'errors': err}
+    existing_movie = MyItem.query.filter_by(
+        id=movie_id,
+        user_who_owns=user_id
+    ).first()
+    if not existing_movie:
+        err.append('Фильм не найден')
+        return {'success': False, 'errors': err}
+    existing_movie.how_its_going = status
+    existing_movie.my_rating = rating_int
+    existing_movie.date_watched = date_watched_obj
+    db.session.commit()
+    return {
+        'success': True,
+        'message': 'Данные успешно сохранены',
+        'movie_name': existing_movie.name
+    }
+
 if __name__ == '__main__':
     app.run(debug=True)
